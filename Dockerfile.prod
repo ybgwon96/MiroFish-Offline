@@ -1,0 +1,18 @@
+FROM python:3.11-slim
+
+# uv 패키지 매니저
+COPY --from=ghcr.io/astral-sh/uv:0.9.26 /uv /uvx /bin/
+
+WORKDIR /app
+
+# Python 의존성 먼저 설치 (캐시)
+COPY backend/pyproject.toml backend/uv.lock ./backend/
+RUN cd backend && uv sync --no-dev
+
+# 소스 복사 (백엔드만)
+COPY backend/ ./backend/
+
+EXPOSE 5001
+
+# Flask 프로덕션 실행
+CMD ["uv", "run", "--directory", "backend", "python", "run.py"]
