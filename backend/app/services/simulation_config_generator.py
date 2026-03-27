@@ -83,7 +83,7 @@ class AgentActivityConfig:
 class TimeSimulationConfig:
     """Time simulation configuration (based on Chinese work schedule habits)"""
     # Total simulation time (simulation hours)
-    total_simulation_hours: int = 72  # Default 72 hours (3 days)
+    total_simulation_hours: int = 24  # Default 24 hours (1 day)
 
     # Time represented per round (simulation minutes) - default 60 minutes (1 hour), speed up time
     minutes_per_round: int = 60
@@ -562,7 +562,7 @@ Please generate time configuration JSON.
 
 Example:
 {{
-    "total_simulation_hours": 72,
+    "total_simulation_hours": 24,
     "minutes_per_round": 60,
     "agents_per_hour_min": 5,
     "agents_per_hour_max": 50,
@@ -574,7 +574,7 @@ Example:
 }}
 
 Field description:
-- total_simulation_hours (int): Total simulation time, 24-168 hours, short for breaking news, long for ongoing topics
+- total_simulation_hours (int): Total simulation time, 12-48 hours, short for breaking news, long for ongoing topics
 - minutes_per_round (int): Time per round, 30-120 minutes, recommend 60 minutes
 - agents_per_hour_min (int): Minimum agents activated per hour (range: 1-{max_agents_allowed})
 - agents_per_hour_max (int): Maximum agents activated per hour (range: 1-{max_agents_allowed})
@@ -595,7 +595,7 @@ Field description:
     def _get_default_time_config(self, num_entities: int) -> Dict[str, Any]:
         """Get default time configuration (Chinese work schedule)"""
         return {
-            "total_simulation_hours": 72,
+            "total_simulation_hours": 24,
             "minutes_per_round": 60,  # 1 hour per round, speed up time
             "agents_per_hour_min": max(1, num_entities // 15),
             "agents_per_hour_max": max(5, num_entities // 5),
@@ -626,9 +626,21 @@ Field description:
             agents_per_hour_min = max(1, agents_per_hour_max // 2)
             logger.warning(f"agents_per_hour_min >= max, corrected to {agents_per_hour_min}")
 
+        total_hours = result.get("total_simulation_hours", 24)
+        minutes_per_round = result.get("minutes_per_round", 60)
+
+        # OASIS_DEFAULT_MAX_ROUNDS로 상한 적용
+        from ..config import Config
+        max_rounds = Config.OASIS_DEFAULT_MAX_ROUNDS
+        if max_rounds and max_rounds > 0:
+            max_hours = max_rounds * minutes_per_round // 60
+            if total_hours > max_hours:
+                logger.info(f"Clamping total_simulation_hours: {total_hours} -> {max_hours} (max_rounds={max_rounds})")
+                total_hours = max_hours
+
         return TimeSimulationConfig(
-            total_simulation_hours=result.get("total_simulation_hours", 72),
-            minutes_per_round=result.get("minutes_per_round", 60),  # Default 1 hour per round
+            total_simulation_hours=total_hours,
+            minutes_per_round=minutes_per_round,
             agents_per_hour_min=agents_per_hour_min,
             agents_per_hour_max=agents_per_hour_max,
             peak_hours=result.get("peak_hours", [19, 20, 21, 22]),
