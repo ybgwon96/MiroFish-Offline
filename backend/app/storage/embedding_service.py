@@ -31,7 +31,13 @@ class EmbeddingService:
         self.base_url = (base_url or Config.EMBEDDING_BASE_URL).rstrip('/')
         self.max_retries = max_retries
         self.timeout = timeout
-        self._embed_url = f"{self.base_url}/api/embed"
+
+        # Ollama → /api/embed, OpenAI 호환(OpenRouter 등) → /embeddings
+        self._is_openai_compat = 'openrouter.ai' in self.base_url or 'openai.com' in self.base_url
+        if self._is_openai_compat:
+            self._embed_url = f"{self.base_url}/embeddings"
+        else:
+            self._embed_url = f"{self.base_url}/api/embed"
 
         # Simple in-memory cache (text -> embedding vector)
         # Using dict instead of lru_cache because lists aren't hashable
@@ -98,7 +104,7 @@ class EmbeddingService:
                 uncached_texts.append(text)
             else:
                 # Empty text — zero vector
-                results[i] = [0.0] * 768
+                results[i] = [0.0] * 1024
 
         # Batch-embed uncached texts
         if uncached_texts:
@@ -129,6 +135,11 @@ class EmbeddingService:
             "model": self.model,
             "input": texts,
         }
+        headers = {}
+        if self._is_openai_compat:
+            api_key = Config.LLM_API_KEY or ""
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
 
         last_error = None
         for attempt in range(self.max_retries):
@@ -136,12 +147,18 @@ class EmbeddingService:
                 response = requests.post(
                     self._embed_url,
                     json=payload,
+                    headers=headers,
                     timeout=self.timeout,
                 )
                 response.raise_for_status()
                 data = response.json()
 
-                embeddings = data.get("embeddings", [])
+                # OpenAI 호환: {"data": [{"embedding": [...]}]}
+                # Ollama: {"embeddings": [[...]]}
+                if self._is_openai_compat:
+                    embeddings = [item["embedding"] for item in data.get("data", [])]
+                else:
+                    embeddings = data.get("embeddings", [])
                 if len(embeddings) != len(texts):
                     raise EmbeddingError(
                         f"Expected {len(texts)} embeddings, got {len(embeddings)}"
