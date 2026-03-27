@@ -286,17 +286,24 @@ class SimulationManager:
                 enrich_with_edges=True
             )
             
+            # 메모리 제한을 위해 엔티티 수 상한 적용
+            max_agents = Config.OASIS_MAX_AGENTS
+            if len(filtered.entities) > max_agents:
+                logger.info(f"Clamping entities: {len(filtered.entities)} -> {max_agents} (OASIS_MAX_AGENTS)")
+                filtered.entities = filtered.entities[:max_agents]
+                filtered.filtered_count = max_agents
+
             state.entities_count = filtered.filtered_count
             state.entity_types = list(filtered.entity_types)
-            
+
             if progress_callback:
                 progress_callback(
-                    "reading", 100, 
+                    "reading", 100,
                     f"Completed, total {filtered.filtered_count} entities",
                     current=filtered.filtered_count,
                     total=filtered.filtered_count
                 )
-            
+
             if filtered.filtered_count == 0:
                 state.status = SimulationStatus.FAILED
                 state.error = "No entities matching criteria found, check if graph is correctly constructed"

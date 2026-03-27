@@ -52,6 +52,7 @@ class Config:
 
     # OASIS simulation configuration
     OASIS_DEFAULT_MAX_ROUNDS = int(os.environ.get('OASIS_DEFAULT_MAX_ROUNDS', '24'))
+    OASIS_MAX_AGENTS = int(os.environ.get('OASIS_MAX_AGENTS', '8'))
     OASIS_SIMULATION_DATA_DIR = os.path.join(os.path.dirname(__file__), '../uploads/simulations')
 
     # OASIS platform available actions configuration
